@@ -622,7 +622,7 @@ public abstract class AbstractMatrix extends AbstractLinearOperator implements M
   
   @Override
   public LinearOperator scale(double scalar) {
-    return assign(Functions.mult(scalar));
+    return times(scalar);
   }
   
   protected class TransposeViewVector extends AbstractVector {

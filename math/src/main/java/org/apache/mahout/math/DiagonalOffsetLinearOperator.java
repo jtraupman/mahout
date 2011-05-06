@@ -78,7 +78,9 @@ public class DiagonalOffsetLinearOperator extends AbstractLinearOperator {
 	@Override
 	public Vector times(Vector v) {
 	  Vector product = matrix.times(v);
-	  product.assign(diagonalOffset, Functions.PLUS);
+	  for (int i = 0; i < v.size(); ++i) {
+	    product.setQuick(i, product.getQuick(i) + diagonalOffset.getQuick(i) * v.getQuick(i));
+	  }
 	  return product;
 	}
 }
