@@ -37,15 +37,27 @@ public class EigenVector extends NamedVector {
   }
 
   public double getEigenValue() {
-    return parseMetaData()[1];
+    return getEigenValue(getName());
   }
 
   public double getCosAngleError() {
-    return parseMetaData()[2];
+    return getCosAngleError(getName());
   }
 
   public int getIndex() {
-    return (int)parseMetaData()[0];
+    return getIndex(getName());
+  }
+
+  public static double getEigenValue(String name) {
+    return parseMetaData(name)[1];
+  }
+
+  public static double getCosAngleError(String name) {
+    return parseMetaData(name)[2];
+  }
+
+  public static int getIndex(String name) {
+    return (int)parseMetaData(name)[0];
   }
 
   public static double[] parseMetaData(String name) {

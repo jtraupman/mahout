@@ -54,23 +54,28 @@ public class TestLinearOperators extends MahoutTestCase {
   private DenseVector av = new DenseVector(new double[] { 0.248760385482841, -0.253771861063209, -0.582148459003500});
   private DenseVector aav = new DenseVector(new double[] { 0.66569612446439475, -0.00598199115997356, 0.90801069383587796 });
   
+  private Vector w = new DenseVector(new double[] {-1.235246340263785, -0.769178028745684, 0.648424632385750});
+  private Vector ones = new DenseVector(new double[] {1.0, 1.0, 1.0});
+
+  protected static void assertEquals(Vector expected, Vector result) {
+    double distance = Math.sqrt(expected.getDistanceSquared(result));
+    assertEquals(0.0, distance, EPSILON);
+  }
+  
   @Test
   public void testApplication() {
     Vector result = a.times(v);
-    double distance = Math.sqrt(av.getDistanceSquared(result));
-    assertEquals(0.0, distance, EPSILON);
+    assertEquals(av, result);
     
     result = a.timesSquared(v);
-    distance = Math.sqrt(aav.getDistanceSquared(result));
-    assertEquals(0.0, distance, EPSILON);
+    assertEquals(aav, result);
   }
   
   @Test
   public void testSquaredLinearOperator() {
     LinearOperator ata = new SquaredLinearOperator(a);
     Vector result = ata.times(v);
-    double distance = Math.sqrt(aav.getDistanceSquared(result));
-    assertEquals(0.0, distance, EPSILON);
+    assertEquals(aav, result);
   }
   
   @Test
@@ -88,11 +93,8 @@ public class TestLinearOperators extends MahoutTestCase {
     Vector result1 = sum.times(v);
     Vector result2 = sumLinop.times(v);
     
-    double distance1 = Math.sqrt(expected.getDistanceSquared(result1));
-    double distance2 = Math.sqrt(expected.getDistanceSquared(result2));
-    
-    assertEquals(0.0, distance1, EPSILON);
-    assertEquals(0.0, distance2, EPSILON);
+    assertEquals(expected, result1);
+    assertEquals(expected, result2);
   }
   
   @Test
@@ -110,11 +112,8 @@ public class TestLinearOperators extends MahoutTestCase {
     Vector result1 = product.times(v);
     Vector result2 = productLinop.times(v);
     
-    double distance1 = Math.sqrt(expected.getDistanceSquared(result1));
-    double distance2 = Math.sqrt(expected.getDistanceSquared(result2));
-    
-    assertEquals(0.0, distance1, EPSILON);
-    assertEquals(0.0, distance2, EPSILON);
+    assertEquals(expected, result1);
+    assertEquals(expected, result2);
   }
   
   @Test
@@ -129,11 +128,8 @@ public class TestLinearOperators extends MahoutTestCase {
     Vector result1 = scaled.times(v);
     Vector result2 = scaledLinop.times(v);
     
-    double distance1 = Math.sqrt(expected.getDistanceSquared(result1));
-    double distance2 = Math.sqrt(expected.getDistanceSquared(result2));
-
-    assertEquals(0.0, distance1, EPSILON);
-    assertEquals(0.0, distance2, EPSILON);
+    assertEquals(expected, result1);
+    assertEquals(expected, result2);
   }
   
   @Test
@@ -141,14 +137,45 @@ public class TestLinearOperators extends MahoutTestCase {
     LinearOperator offset1 = new DiagonalOffsetLinearOperator(a, 0.1);
     Vector result = offset1.times(v);
     Vector expected = a.times(v).plus(v.times(0.1));
-    double distance = Math.sqrt(expected.getDistanceSquared(result));
-    assertEquals(0.0, distance, EPSILON);
+    assertEquals(expected, result);
     
-    Vector w = new DenseVector(new double[] {-1.235246340263785, -0.769178028745684, 0.648424632385750});
     LinearOperator offset2 = new DiagonalOffsetLinearOperator(a, w);
     result = offset2.times(v);
     expected = a.times(v).plus(v.times(w));
-    distance = Math.sqrt(expected.getDistanceSquared(result));
-    assertEquals(0.0, distance, EPSILON);
+    assertEquals(expected, result);
+  }
+  
+  @Test
+  public void testRowOffsetLinearOperator() {    
+    LinearOperator offset = new RowOffsetLinearOperator(a, w);
+    
+    Vector result = offset.times(v);
+    Vector expected = a.times(v).plus(ones.times(w.dot(v)));
+    assertEquals(expected, result);
+    
+    offset = new RowOffsetLinearOperator(a, 0.1);
+    result = offset.times(v);
+    expected = a.times(v).plus(ones.times(ones.times(0.1).dot(v)));
+
+    assertEquals(expected, result);
+    
+    // for scalar offsets, both row and column offset operators should give the same results
+    
+    LinearOperator colOffset = new ColumnOffsetLinearOperator(a, 0.1);
+    Vector colResult = colOffset.times(v);
+    assertEquals(result, colResult);
+  }
+  
+  @Test
+  public void testColumnOffsetLinearOperator() {
+    LinearOperator offset = new ColumnOffsetLinearOperator(a, w);
+    Vector result = offset.times(v);
+    Vector expected = a.times(v).plus(w.times(ones.dot(v)));
+    assertEquals(expected, result);
+    
+    offset = new ColumnOffsetLinearOperator(a, 0.1);
+    result = offset.times(v);
+    expected = a.times(v).plus(ones.times(0.1).times(ones.dot(v)));
+    assertEquals(expected, result);
   }
 }

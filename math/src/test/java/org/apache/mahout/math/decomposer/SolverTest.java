@@ -36,6 +36,10 @@ import org.apache.mahout.math.function.Functions;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
+
 public abstract class SolverTest extends MahoutTestCase {
   private static Logger log = LoggerFactory.getLogger(SolverTest.class);
 
@@ -170,14 +174,7 @@ public abstract class SolverTest extends MahoutTestCase {
       matrix.assignRow(row, v);
     }
     if(symmetric) {
-      //if(true) {
-        return matrix.times(matrix.transpose());
-      //}
-      //for(int i = 0; i < numRows; i++) {
-      //  for(int j = 0; j < i; j++) {
-      //    matrix.set(j, i, matrix.get(i, j));
-      //  }
-      //}
+      return matrix.times(matrix.transpose());
     }
     return matrix;
   }
