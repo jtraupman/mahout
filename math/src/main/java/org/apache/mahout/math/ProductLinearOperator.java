@@ -35,4 +35,9 @@ public class ProductLinearOperator extends AbstractLinearOperator {
   public Vector times(Vector v) {
     return a.times(b.times(v));
   }
+
+  @Override
+  public LinearOperator transpose() {
+    return new ProductLinearOperator(b.transpose(), a.transpose());
+  }
 }

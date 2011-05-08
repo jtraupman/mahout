@@ -61,5 +61,10 @@ public class ColumnOffsetLinearOperator extends AbstractLinearOperator {
     double sumv = v.aggregate(Functions.PLUS, Functions.IDENTITY);
     result.assign(offset, Functions.plusMult(sumv));
     return result;
+  }
+
+  @Override
+  public LinearOperator transpose() {
+    return new RowOffsetLinearOperator(linop.transpose(), offset);
   }  
 }

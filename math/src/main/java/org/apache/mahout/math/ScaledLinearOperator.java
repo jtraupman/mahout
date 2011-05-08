@@ -31,5 +31,10 @@ public class ScaledLinearOperator extends AbstractLinearOperator {
     Vector result = a.times(v);
     result.assign(Functions.MULT, scalar);
     return result;
+  }
+
+  @Override
+  public LinearOperator transpose() {
+    return new ScaledLinearOperator(a.transpose(), scalar);
   }  
 }

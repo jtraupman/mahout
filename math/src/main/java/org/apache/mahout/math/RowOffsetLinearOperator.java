@@ -62,4 +62,9 @@ public class RowOffsetLinearOperator extends AbstractLinearOperator {
     result.assign(Functions.PLUS, offset.dot(v));
     return result;
   }
+
+  @Override
+  public LinearOperator transpose() {
+    return new ColumnOffsetLinearOperator(linop.transpose(), offset);
+  }
 }

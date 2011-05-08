@@ -107,7 +107,7 @@ public class MatrixMultiplicationJob extends AbstractJob {
     b.setConf(new Configuration(getConf()));
 
     //DistributedRowMatrix c = a.times(b);
-    a.times(b);
+    a.transposeTimes(b);
     return 0;
   }
 

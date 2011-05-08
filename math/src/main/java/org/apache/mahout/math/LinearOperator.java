@@ -90,6 +90,12 @@ public interface LinearOperator {
    * @return The scaled operator.
    */
   
-  public LinearOperator scale(double scalar);
+  public LinearOperator times(double scalar);
   
+  /**
+   * Transposes the linear operator.
+   * 
+   * @return
+   */
+  public LinearOperator transpose();  
 }

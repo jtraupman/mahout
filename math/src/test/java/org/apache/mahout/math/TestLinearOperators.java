@@ -16,39 +16,36 @@ public class TestLinearOperators extends MahoutTestCase {
   private DenseMatrix a = new DenseMatrix(aValues);
   private DenseMatrix b = new DenseMatrix(bValues);
   
-  LinearOperator linopA = new AbstractLinearOperator() {
+  private class WrappedLinearOperator extends AbstractLinearOperator {
+    private Matrix matrix;
+
+    public WrappedLinearOperator(Matrix matrix) {
+      this.matrix = matrix;
+    }
+    
+    @Override
+    public LinearOperator transpose() {
+      return new WrappedLinearOperator(matrix.transpose());
+    }
+
     @Override
     public int numRows() {
-      return a.numRows();
+      return matrix.numRows();
     }
 
     @Override
     public int numCols() {
-      return a.numCols();
+      return matrix.numCols();
     }
 
     @Override
     public Vector times(Vector v) {
-      return a.times(v);
+      return matrix.times(v);
     }
-  };
+  }
   
-  LinearOperator linopB = new AbstractLinearOperator() {
-    @Override
-    public int numRows() {
-      return b.numRows();
-    }
-
-    @Override
-    public int numCols() {
-      return b.numCols();
-    }
-
-    @Override
-    public Vector times(Vector v) {
-      return b.times(v);
-    }
-  };
+  LinearOperator linopA = new WrappedLinearOperator(a);
+  LinearOperator linopB = new WrappedLinearOperator(b);
   
   private DenseVector v = new DenseVector(new double[] {0.8134542290782942, 1.6289304763813024, -0.0733365425049696});
   private DenseVector av = new DenseVector(new double[] { 0.248760385482841, -0.253771861063209, -0.582148459003500});
@@ -64,18 +61,18 @@ public class TestLinearOperators extends MahoutTestCase {
   
   @Test
   public void testApplication() {
-    Vector result = a.times(v);
-    assertEquals(av, result);
-    
-    result = a.timesSquared(v);
-    assertEquals(aav, result);
+    assertEquals(av, a.times(v));    
+    assertEquals(aav, a.timesSquared(v));
+
+    assertEquals(av, linopA.times(v));
+    assertEquals(aav, linopA.timesSquared(v));
   }
   
   @Test
   public void testSquaredLinearOperator() {
     LinearOperator ata = new SquaredLinearOperator(a);
-    Vector result = ata.times(v);
-    assertEquals(aav, result);
+    assertEquals(aav, ata.times(v));
+    assertEquals(aav, ata.transpose().times(v));
   }
   
   @Test
@@ -90,11 +87,9 @@ public class TestLinearOperators extends MahoutTestCase {
     assertFalse(sumLinop instanceof Matrix);
     
     Vector expected = a.times(v).plus(b.times(v));
-    Vector result1 = sum.times(v);
-    Vector result2 = sumLinop.times(v);
     
-    assertEquals(expected, result1);
-    assertEquals(expected, result2);
+    assertEquals(expected, sum.times(v));
+    assertEquals(expected, sumLinop.times(v));
   }
   
   @Test
@@ -109,73 +104,71 @@ public class TestLinearOperators extends MahoutTestCase {
     assertFalse(productLinop instanceof Matrix);
     
     Vector expected = a.times(b.times(v));
-    Vector result1 = product.times(v);
-    Vector result2 = productLinop.times(v);
     
-    assertEquals(expected, result1);
-    assertEquals(expected, result2);
+    assertEquals(expected, product.times(v));
+    assertEquals(expected, productLinop.times(v));
   }
   
   @Test
   public void testLinearOperatorScaling() {
-    LinearOperator scaled = a.scale(2.0);
+    LinearOperator scaled = a.times(2.0);
     assertTrue(scaled instanceof Matrix);
     
-    LinearOperator scaledLinop = linopA.scale(2.0);
+    LinearOperator scaledLinop = linopA.times(2.0);
     assertFalse(scaledLinop instanceof Matrix);
     
     Vector expected = a.times(2.0).times(v);
-    Vector result1 = scaled.times(v);
-    Vector result2 = scaledLinop.times(v);
     
-    assertEquals(expected, result1);
-    assertEquals(expected, result2);
+    assertEquals(expected, scaled.times(v));
+    assertEquals(expected, scaledLinop.times(v));
+  }
+  
+  @Test
+  public void testLinearOperatorTranspose() {
+    assertEquals(a.transpose().times(v), linopA.transpose().times(v));
+    assertEquals(b.transpose().times(a.transpose().times(v)), linopA.times(linopB).transpose().times(v));
+    assertEquals(a.transpose().plus(b.transpose()).times(v), linopA.plus(linopB).transpose().times(v));
+    assertEquals(a.transpose().times(0.1).times(v), linopA.times(0.1).transpose().times(v));    
   }
   
   @Test
   public void testDiagonalOffsetLinearOperator() {
     LinearOperator offset1 = new DiagonalOffsetLinearOperator(a, 0.1);
-    Vector result = offset1.times(v);
-    Vector expected = a.times(v).plus(v.times(0.1));
-    assertEquals(expected, result);
-    
     LinearOperator offset2 = new DiagonalOffsetLinearOperator(a, w);
-    result = offset2.times(v);
-    expected = a.times(v).plus(v.times(w));
-    assertEquals(expected, result);
+
+    assertEquals(a.times(v).plus(v.times(0.1)), offset1.times(v));  
+    assertEquals(a.times(v).plus(v.times(w)), offset2.times(v));
+    
+    assertEquals(a.transpose().times(v).plus(v.times(0.1)), offset1.transpose().times(v));
+    assertEquals(a.transpose().times(v).plus(v.times(w)), offset2.transpose().times(v));
   }
   
   @Test
   public void testRowOffsetLinearOperator() {    
     LinearOperator offset = new RowOffsetLinearOperator(a, w);
     
-    Vector result = offset.times(v);
-    Vector expected = a.times(v).plus(ones.times(w.dot(v)));
-    assertEquals(expected, result);
+    assertEquals(a.times(v).plus(ones.times(w.dot(v))), offset.times(v));
+    assertEquals(a.transpose().times(v).plus(w.times(ones.dot(v))), offset.transpose().times(v));
     
     offset = new RowOffsetLinearOperator(a, 0.1);
-    result = offset.times(v);
-    expected = a.times(v).plus(ones.times(ones.times(0.1).dot(v)));
 
-    assertEquals(expected, result);
+    assertEquals(a.times(v).plus(ones.times(ones.times(0.1).dot(v))), offset.times(v));
+    assertEquals(a.transpose().times(v).plus(ones.times(0.1).times(ones.dot(v))), offset.transpose().times(v));
     
     // for scalar offsets, both row and column offset operators should give the same results
     
     LinearOperator colOffset = new ColumnOffsetLinearOperator(a, 0.1);
-    Vector colResult = colOffset.times(v);
-    assertEquals(result, colResult);
+    assertEquals(offset.times(v), colOffset.times(v));
   }
   
   @Test
   public void testColumnOffsetLinearOperator() {
     LinearOperator offset = new ColumnOffsetLinearOperator(a, w);
-    Vector result = offset.times(v);
-    Vector expected = a.times(v).plus(w.times(ones.dot(v)));
-    assertEquals(expected, result);
+    assertEquals(a.times(v).plus(w.times(ones.dot(v))), offset.times(v));
+    assertEquals(a.transpose().times(v).plus(ones.times(w.dot(v))), offset.transpose().times(v));
     
     offset = new ColumnOffsetLinearOperator(a, 0.1);
-    result = offset.times(v);
-    expected = a.times(v).plus(ones.times(0.1).times(ones.dot(v)));
-    assertEquals(expected, result);
+    assertEquals(a.times(v).plus(ones.times(0.1).times(ones.dot(v))), offset.times(v));
+    assertEquals(a.transpose().times(v).plus(ones.times(ones.times(0.1).dot(v))), offset.transpose().times(v));
   }
 }

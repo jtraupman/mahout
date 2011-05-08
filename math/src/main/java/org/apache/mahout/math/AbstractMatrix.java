@@ -619,12 +619,7 @@ public abstract class AbstractMatrix extends AbstractLinearOperator implements M
       return super.plus(other);
     }
   }
-  
-  @Override
-  public LinearOperator scale(double scalar) {
-    return times(scalar);
-  }
-  
+    
   protected class TransposeViewVector extends AbstractVector {
 
     private final Matrix matrix;

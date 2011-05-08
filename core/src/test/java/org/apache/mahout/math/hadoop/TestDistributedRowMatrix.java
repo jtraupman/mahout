@@ -106,7 +106,7 @@ public final class TestDistributedRowMatrix extends MahoutTestCase {
 
     DistributedRowMatrix distA = randomDistributedMatrix(20, 19, 15, 5, 10.0, false, "distA");
     DistributedRowMatrix distB = randomDistributedMatrix(20, 13, 25, 10, 5.0, false, "distB");
-    DistributedRowMatrix product = distA.times(distB);
+    DistributedRowMatrix product = distA.transposeTimes(distB);
 
     assertEquals(expected, product, EPSILON);
   }

@@ -34,4 +34,9 @@ public class SumLinearOperator extends AbstractLinearOperator {
     result1.assign(result2, Functions.PLUS);
     return result1;
   }
+
+  @Override
+  public LinearOperator transpose() {
+    return new SumLinearOperator(a.transpose(), b.transpose());
+  }
 }

@@ -26,5 +26,12 @@ public class SquaredLinearOperator extends AbstractLinearOperator {
   @Override
   public Vector times(Vector v) {
     return operator.timesSquared(v);
+  }
+
+  @Override
+  public LinearOperator transpose() {
+    // squared operators are always symmetric
+    
+    return this;
   }  
 }

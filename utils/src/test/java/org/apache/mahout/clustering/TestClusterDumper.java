@@ -352,7 +352,7 @@ public final class TestClusterDumper extends MahoutTestCase {
     svdT.setConf(conf);
     DistributedRowMatrix a = new DistributedRowMatrix(testData, tmp, sampleData.size(), sampleDimension);
     a.setConf(conf);
-    DistributedRowMatrix sData = a.transpose().times(svdT.transpose());
+    DistributedRowMatrix sData = a.transpose().transposeTimes(svdT.transpose());
     sData.setConf(conf);
 
     // now run the Canopy job to prime kMeans canopies
@@ -391,7 +391,7 @@ public final class TestClusterDumper extends MahoutTestCase {
     DistributedRowMatrix a = new DistributedRowMatrix(testData, tmp, sampleData.size(),
         sampleDimension);
     a.setConf(conf);
-    DistributedRowMatrix sData = a.transpose().times(svdT.transpose());
+    DistributedRowMatrix sData = a.transpose().transposeTimes(svdT.transpose());
     sData.setConf(conf);
 
     // now run the Canopy job to prime kMeans canopies

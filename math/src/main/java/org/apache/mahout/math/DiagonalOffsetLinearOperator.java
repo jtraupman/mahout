@@ -83,4 +83,9 @@ public class DiagonalOffsetLinearOperator extends AbstractLinearOperator {
 	  }
 	  return product;
 	}
+
+  @Override
+  public LinearOperator transpose() {
+    return new DiagonalOffsetLinearOperator(matrix.transpose(), diagonalOffset);
+  }
 }

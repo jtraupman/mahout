@@ -168,7 +168,7 @@ public class DistributedRowMatrix extends AbstractLinearOperator implements Line
    * @param other   a DistributedRowMatrix
    * @return    a DistributedRowMatrix containing the product
    */
-  public DistributedRowMatrix times(DistributedRowMatrix other) throws IOException {
+  public DistributedRowMatrix transposeTimes(DistributedRowMatrix other) throws IOException {
     if (numRows != other.numRows()) {
       throw new CardinalityException(numRows, other.numRows());
     }
@@ -187,14 +187,18 @@ public class DistributedRowMatrix extends AbstractLinearOperator implements Line
     return out;
   }
 
-  public DistributedRowMatrix transpose() throws IOException {
-    Path outputPath = new Path(rowPath.getParent(), "transpose-" + (System.nanoTime() & 0xFF));
-    Configuration initialConf = getConf() == null ? new Configuration() : getConf();
-    Configuration conf = TransposeJob.buildTransposeJobConf(initialConf, rowPath, outputPath, numRows);
-    JobClient.runJob(new JobConf(conf));
-    DistributedRowMatrix m = new DistributedRowMatrix(outputPath, outputTmpPath, numCols, numRows);
-    m.setConf(this.conf);
-    return m;
+  public DistributedRowMatrix transpose() {
+    try {
+      Path outputPath = new Path(rowPath.getParent(), "transpose-" + (System.nanoTime() & 0xFF));
+      Configuration initialConf = getConf() == null ? new Configuration() : getConf();
+      Configuration conf = TransposeJob.buildTransposeJobConf(initialConf, rowPath, outputPath, numRows);
+      JobClient.runJob(new JobConf(conf));
+      DistributedRowMatrix m = new DistributedRowMatrix(outputPath, outputTmpPath, numCols, numRows);
+      m.setConf(this.conf);
+      return m;
+    } catch (IOException e) {
+      throw new IllegalStateException(e);
+    }
   }
 
   @Override

@@ -56,7 +56,7 @@ public abstract class AbstractLinearOperator implements LinearOperator {
   public abstract Vector times(Vector v);
 
   public Vector timesSquared(Vector v) {
-    return times(times(v));
+    return transpose().times(times(v));
   }
 
   /**
@@ -105,7 +105,7 @@ public abstract class AbstractLinearOperator implements LinearOperator {
    * @return The scaled operator.
    */
   
-  public LinearOperator scale(double scalar) {
+  public LinearOperator times(double scalar) {
     return new ScaledLinearOperator(this, scalar);
   }
 }
