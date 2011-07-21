@@ -15,24 +15,30 @@
  * limitations under the License.
  */
 
-package org.apache.mahout.classifier.naivebayes;
+package org.apache.mahout.math.stats.entropy;
+
+import org.apache.hadoop.io.DoubleWritable;
+import org.apache.hadoop.io.Writable;
+import org.apache.hadoop.mapreduce.Reducer;
+
+import java.io.IOException;
 
 /**
- * Class containing Constants used by Naive Bayes classifier classes
- * 
+ * Analog of {@link org.apache.hadoop.mapreduce.lib.reduce.IntSumReducer} which sums the double values.
  */
-public final class BayesConstants {
-  
-  // Ensure all the strings are unique
-  //public static final String ALPHA_SMOOTHING_FACTOR = "__SF"; // -
-  
-  //public static final String WEIGHT = "__WT";
-  
-  public static final String FEATURE_SUM = "__SJ";
-  
-  public static final String LABEL_SUM = "__SK";
-  
-  public static final String LABEL_THETA_NORMALIZER = "_LTN";
-  
-  private BayesConstants() { }
+public final class DoubleSumReducer extends Reducer<Writable, DoubleWritable, Writable, DoubleWritable> {
+
+  private final DoubleWritable result = new DoubleWritable();
+
+  @Override
+  protected void reduce(Writable key, Iterable<DoubleWritable> values, Context context)
+      throws IOException, InterruptedException {
+    double sum = 0.0;
+    for (DoubleWritable value : values) {
+      sum += value.get();
+    }
+    result.set(sum);
+    context.write(key, result);
+  }
+
 }

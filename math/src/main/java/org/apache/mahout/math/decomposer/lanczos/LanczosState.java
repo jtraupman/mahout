@@ -15,10 +15,10 @@ public class LanczosState {
   protected LinearOperator corpus;
   protected double scaleFactor;
   protected int iterationNumber;
-  protected int desiredRank;
+  protected final int desiredRank;
   protected Map<Integer, Vector> basis;
 
-  protected Map<Integer, Double> singularValues;
+  protected final Map<Integer, Double> singularValues;
   protected Map<Integer, Vector> singularVectors;
 
   public LanczosState(LinearOperator corpus, int numCols, boolean isSymmetric, int desiredRank, Vector initialVector) {

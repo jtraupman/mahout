@@ -1,4 +1,4 @@
-/*
+/**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
  * this work for additional information regarding copyright ownership.
@@ -15,15 +15,27 @@
  * limitations under the License.
  */
 
-package org.apache.mahout.math;
+package org.apache.mahout.math.stats.entropy;
 
-public class VectorListTest extends MatrixTest {
+import org.apache.hadoop.io.DoubleWritable;
+import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.mahout.math.VarIntWritable;
+
+import java.io.IOException;
+
+/**
+ * Calculates the entropy for the value with H(x) = x * log(x)
+ */
+public final class CalculateEntropyMapper extends Mapper<Text, VarIntWritable, NullWritable, DoubleWritable> {
+
+  private final DoubleWritable result = new DoubleWritable();
+
   @Override
-  public Matrix matrixFactory(double[][] values) {
-    VectorList r = new VectorList(values[0].length);
-    for (double[] row : values) {
-      r.adjoinRow(new DenseVector(row));
-    }
-    return r;
+  protected void map(Text key, VarIntWritable value, Context context) throws IOException, InterruptedException {
+    result.set(value.get() * Math.log(value.get()));
+    context.write(NullWritable.get(), result);
   }
+
 }
