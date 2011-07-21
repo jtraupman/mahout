@@ -17,6 +17,7 @@
 
 package org.apache.mahout.vectorizer;
 
+import com.google.common.io.Closeables;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -25,13 +26,15 @@ import org.apache.hadoop.io.SequenceFile;
 import org.apache.hadoop.io.Text;
 import org.apache.mahout.common.MahoutTestCase;
 import org.apache.mahout.common.StringTuple;
+import org.apache.mahout.common.iterator.sequencefile.PathFilters;
 import org.junit.Test;
 
 import java.util.Arrays;
 
 /**
- * Tests tokenizing of <Text documentId, Text text> {@link SequenceFile}s by the {@link DocumentProcessor} into
- * <Text documentId, StringTuple tokens> sequence files
+ * Tests tokenizing of {@link SequenceFile}s containing document ID and text (both as {@link Text})
+ * by the {@link DocumentProcessor} into {@link SequenceFile}s of document ID and tokens (as
+ * {@link StringTuple}).
  */
 public class DocumentProcessorTest extends MahoutTestCase {
 
@@ -43,18 +46,21 @@ public class DocumentProcessorTest extends MahoutTestCase {
     Path output = new Path(getTestTempDirPath(), "outputDir");
 
     String documentId1 = "123";
-    String text1 = "A test for the document processor";
+    String documentId2 = "456";
 
     SequenceFile.Writer writer = new SequenceFile.Writer(fs, configuration, input, Text.class, Text.class);
-    writer.append(new Text(documentId1), new Text(text1));
-    String documentId2 = "456";
-    String text2 = "and another one";
-    writer.append(new Text(documentId2), new Text(text2));
-    writer.close();
+    try {
+      String text1 = "A test for the document processor";
+      writer.append(new Text(documentId1), new Text(text1));
+      String text2 = "and another one";
+      writer.append(new Text(documentId2), new Text(text2));
+    } finally {
+      Closeables.closeQuietly(writer);
+    }
 
     DocumentProcessor.tokenizeDocuments(input, DefaultAnalyzer.class, output, configuration);
 
-    FileStatus[] statuses = fs.listStatus(output);
+    FileStatus[] statuses = fs.listStatus(output, PathFilters.logsCRCFilter());
     assertEquals(1, statuses.length);
     Path filePath = statuses[0].getPath();
     SequenceFile.Reader reader = new SequenceFile.Reader(fs, filePath, configuration);

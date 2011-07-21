@@ -42,7 +42,7 @@ import org.apache.mahout.math.hadoop.similarity.RowSimilarityJob.SimilarityReduc
 import org.apache.mahout.math.hadoop.similarity.vector.DistributedTanimotoCoefficientVectorSimilarity;
 import org.apache.mahout.math.hadoop.similarity.vector.DistributedVectorSimilarity;
 import org.easymock.IArgumentMatcher;
-import org.easymock.classextension.EasyMock;
+import org.easymock.EasyMock;
 import org.junit.Test;
 
 /**
@@ -324,7 +324,7 @@ public final class TestRowSimilarityJob extends MahoutTestCase {
 
     @Override
     public double similarity(int rowA, int rowB, Iterable<Cooccurrence> cooccurrences, double weightOfVectorA,
-        double weightOfVectorB, int numberOfRows) {
+        double weightOfVectorB, long numberOfRows) {
       if (rowA == rowB) {
         return Double.NaN;
       }

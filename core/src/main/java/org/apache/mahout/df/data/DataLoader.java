@@ -18,12 +18,11 @@
 package org.apache.mahout.df.data;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
-import java.util.StringTokenizer;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -61,23 +60,17 @@ public final class DataLoader {
    * @return null if there are missing values '?'
    */
   private static Instance parseString(int id, Attribute[] attrs, List<String>[] values, String string) {
-    StringTokenizer tokenizer = new StringTokenizer(string, ", ");
-    Preconditions.checkArgument(tokenizer.countTokens() == attrs.length, "Wrong number of attributes in the string");
+    String[] tokens = string.split("[, ]");
+    Preconditions.checkArgument(tokens.length == attrs.length, "Wrong number of attributes in the string");
 
     // extract tokens and check is there is any missing value
-    String[] tokens = new String[attrs.length];
     for (int attr = 0; attr < attrs.length; attr++) {
-      String token = tokenizer.nextToken();
-      
       if (attrs[attr].isIgnored()) {
         continue;
       }
-      
-      if ("?".equals(token)) {
+      if ("?".equals(tokens[attr])) {
         return null; // missing value
       }
-      
-      tokens[attr] = token;
     }
     
     int nbattrs = Dataset.countAttributes(attrs);
@@ -98,7 +91,7 @@ public final class DataLoader {
       } else { // CATEGORICAL or LABEL
         // update values
         if (values[attr] == null) {
-          values[attr] = new ArrayList<String>();
+          values[attr] = Lists.newArrayList();
         }
         if (!values[attr].contains(token)) {
           values[attr].add(token);
@@ -134,7 +127,7 @@ public final class DataLoader {
     FSDataInputStream input = fs.open(fpath);
     Scanner scanner = new Scanner(input);
     
-    List<Instance> instances = new ArrayList<Instance>();
+    List<Instance> instances = Lists.newArrayList();
     
     DataConverter converter = new DataConverter(dataset);
     
@@ -164,7 +157,7 @@ public final class DataLoader {
    * Loads the data from a String array
    */
   public static Data loadData(Dataset dataset, String[] data) {
-    List<Instance> instances = new ArrayList<Instance>();
+    List<Instance> instances = Lists.newArrayList();
     
     DataConverter converter = new DataConverter(dataset);
     
@@ -249,22 +242,5 @@ public final class DataLoader {
     
     return new Dataset(attrs, values, id);
   }
-  
-  /**
-   * constructs the data
-   * 
-   * @param attrs
-   *          attributes description
-   * @param vectors
-   *          data elements
-   * @param values
-   *          used to convert CATEGORICAL attributes to Integer
-   */
-  /*
-  private static Data constructData(Attribute[] attrs, List<Instance> vectors, List<String>[] values) {
-    Dataset dataset = new Dataset(attrs, values, vectors.size());
-    
-    return new Data(dataset, vectors);
-  }
-   */
+
 }

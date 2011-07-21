@@ -17,10 +17,10 @@
 
 package org.apache.mahout.math.decomposer.hebbian;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.apache.mahout.math.AbstractMatrix;
+import com.google.common.collect.Lists;
 import org.apache.mahout.math.DenseVector;
 import org.apache.mahout.math.Matrix;
 import org.apache.mahout.math.Vector;
@@ -45,7 +45,7 @@ public class TrainingState {
     trainingIndex = 0;
     helperVector = new DenseVector(eigens.numRows());
     firstPass = true;
-    statusProgress = new ArrayList<EigenStatus>();
+    statusProgress = Lists.newArrayList();
     activationNumerator = 0;
     activationDenominatorSquared = 0;
     numEigensProcessed = 0;

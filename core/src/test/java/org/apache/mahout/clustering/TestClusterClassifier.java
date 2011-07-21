@@ -18,10 +18,10 @@
 package org.apache.mahout.clustering;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.commons.lang.NotImplementedException;
+import com.google.common.collect.Lists;
+import com.google.common.io.Closeables;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -38,24 +38,24 @@ import org.apache.mahout.common.distance.DistanceMeasure;
 import org.apache.mahout.common.distance.ManhattanDistanceMeasure;
 import org.apache.mahout.math.DenseVector;
 import org.apache.mahout.math.Vector;
+import org.apache.mahout.math.VectorWritable;
 import org.junit.Test;
 
 public final class TestClusterClassifier extends MahoutTestCase {
   
-  private ClusterClassifier newDMClassifier() {
-    List<Cluster> models = new ArrayList<Cluster>();
+  private static ClusterClassifier newDMClassifier() {
+    List<Cluster> models = Lists.newArrayList();
     DistanceMeasure measure = new ManhattanDistanceMeasure();
     models.add(new DistanceMeasureCluster(new DenseVector(2).assign(1), 0,
         measure));
     models.add(new DistanceMeasureCluster(new DenseVector(2), 1, measure));
     models.add(new DistanceMeasureCluster(new DenseVector(2).assign(-1), 2,
         measure));
-    ClusterClassifier classifier = new ClusterClassifier(models);
-    return classifier;
+    return new ClusterClassifier(models);
   }
   
-  private ClusterClassifier newClusterClassifier() {
-    List<Cluster> models = new ArrayList<Cluster>();
+  private static ClusterClassifier newClusterClassifier() {
+    List<Cluster> models = Lists.newArrayList();
     DistanceMeasure measure = new ManhattanDistanceMeasure();
     models.add(new org.apache.mahout.clustering.kmeans.Cluster(new DenseVector(
         2).assign(1), 0, measure));
@@ -63,30 +63,27 @@ public final class TestClusterClassifier extends MahoutTestCase {
         2), 1, measure));
     models.add(new org.apache.mahout.clustering.kmeans.Cluster(new DenseVector(
         2).assign(-1), 2, measure));
-    ClusterClassifier classifier = new ClusterClassifier(models);
-    return classifier;
+    return new ClusterClassifier(models);
   }
   
-  private ClusterClassifier newSoftClusterClassifier() {
-    List<Cluster> models = new ArrayList<Cluster>();
+  private static ClusterClassifier newSoftClusterClassifier() {
+    List<Cluster> models = Lists.newArrayList();
     DistanceMeasure measure = new ManhattanDistanceMeasure();
     models.add(new SoftCluster(new DenseVector(2).assign(1), 0, measure));
     models.add(new SoftCluster(new DenseVector(2), 1, measure));
     models.add(new SoftCluster(new DenseVector(2).assign(-1), 2, measure));
-    ClusterClassifier classifier = new ClusterClassifier(models);
-    return classifier;
+    return new ClusterClassifier(models);
   }
   
-  private ClusterClassifier newGaussianClassifier() {
-    List<Cluster> models = new ArrayList<Cluster>();
+  private static ClusterClassifier newGaussianClassifier() {
+    List<Cluster> models = Lists.newArrayList();
     models.add(new GaussianCluster(new DenseVector(2).assign(1),
         new DenseVector(2).assign(1), 0));
     models.add(new GaussianCluster(new DenseVector(2), new DenseVector(2)
         .assign(1), 1));
     models.add(new GaussianCluster(new DenseVector(2).assign(-1),
         new DenseVector(2).assign(1), 2));
-    ClusterClassifier classifier = new ClusterClassifier(models);
-    return classifier;
+    return new ClusterClassifier(models);
   }
   
   private ClusterClassifier writeAndRead(ClusterClassifier classifier)
@@ -94,17 +91,35 @@ public final class TestClusterClassifier extends MahoutTestCase {
     Configuration config = new Configuration();
     Path path = new Path(getTestTempDirPath(), "output");
     FileSystem fs = FileSystem.get(path.toUri(), config);
+    writeClassifier(classifier, config, path, fs);
+    return readClassifier(config, path, fs);
+  }
+  
+  private static void writeClassifier(ClusterClassifier classifier,
+                                      Configuration config,
+                                      Path path,
+                                      FileSystem fs) throws IOException {
     SequenceFile.Writer writer = new SequenceFile.Writer(fs, config, path,
         Text.class, ClusterClassifier.class);
     Writable key = new Text("test");
-    writer.append(key, classifier);
-    writer.close();
-    
+    try {
+      writer.append(key, classifier);
+    } finally {
+      Closeables.closeQuietly(writer);
+    }
+  }
+  
+  private static ClusterClassifier readClassifier(Configuration config,
+                                                  Path path,
+                                                  FileSystem fs) throws IOException {
     SequenceFile.Reader reader = new SequenceFile.Reader(fs, path, config);
-    key = new Text();
+    Writable key = new Text();
     ClusterClassifier classifierOut = new ClusterClassifier();
-    reader.next(key, classifierOut);
-    reader.close();
+    try {
+      reader.next(key, classifierOut);
+    } finally {
+      Closeables.closeQuietly(reader);
+    }
     return classifierOut;
   }
   
@@ -121,7 +136,7 @@ public final class TestClusterClassifier extends MahoutTestCase {
   
   @Test
   public void testCanopyClassification() {
-    List<Cluster> models = new ArrayList<Cluster>();
+    List<Cluster> models = Lists.newArrayList();
     DistanceMeasure measure = new ManhattanDistanceMeasure();
     models.add(new Canopy(new DenseVector(2).assign(1), 0, measure));
     models.add(new Canopy(new DenseVector(2), 1, measure));
@@ -146,18 +161,15 @@ public final class TestClusterClassifier extends MahoutTestCase {
         AbstractCluster.formatVector(pdf, null));
   }
   
-  @Test
+  @Test(expected = UnsupportedOperationException.class)
   public void testMSCanopyClassification() {
-    List<Cluster> models = new ArrayList<Cluster>();
+    List<Cluster> models = Lists.newArrayList();
     DistanceMeasure measure = new ManhattanDistanceMeasure();
     models.add(new MeanShiftCanopy(new DenseVector(2).assign(1), 0, measure));
     models.add(new MeanShiftCanopy(new DenseVector(2), 1, measure));
     models.add(new MeanShiftCanopy(new DenseVector(2).assign(-1), 2, measure));
     ClusterClassifier classifier = new ClusterClassifier(models);
-    try {
-      classifier.classify(new DenseVector(2));
-      fail("Expected NotImplementedException");
-    } catch (NotImplementedException e) {}
+    classifier.classify(new DenseVector(2));
   }
   
   @Test
@@ -232,11 +244,10 @@ public final class TestClusterClassifier extends MahoutTestCase {
     ClusterClassifier posterior = iterator.iterate(data, prior, 5);
     assertEquals(3, posterior.getModels().size());
     for (Cluster cluster : posterior.getModels()) {
-      System.out
-          .println(cluster.asFormatString(null));
+      System.out.println(cluster.asFormatString(null));
     }
   }
-
+  
   @Test
   public void testClusterIteratorDirichlet() {
     List<Vector> data = TestKmeansClustering
@@ -247,8 +258,42 @@ public final class TestClusterClassifier extends MahoutTestCase {
     ClusterClassifier posterior = iterator.iterate(data, prior, 5);
     assertEquals(3, posterior.getModels().size());
     for (Cluster cluster : posterior.getModels()) {
-      System.out
-          .println(cluster.asFormatString(null));
+      System.out.println(cluster.asFormatString(null));
+    }
+  }
+  
+  @Test
+  public void testSeqFileClusterIteratorKMeans() throws IOException {
+    Path pointsPath = getTestTempDirPath("points");
+    Path priorPath = getTestTempDirPath("prior");
+    Path outPath = getTestTempDirPath("output");
+    Configuration conf = new Configuration();
+    FileSystem fs = FileSystem.get(conf);
+    List<VectorWritable> points = TestKmeansClustering
+        .getPointsWritable(TestKmeansClustering.REFERENCE);
+    ClusteringTestUtils.writePointsToFile(points,
+        new Path(pointsPath, "file1"), fs, conf);
+    Path path = new Path(priorPath, "priorClassifier");
+    ClusterClassifier prior = newClusterClassifier();
+    writeClassifier(prior, conf, path, fs);
+    assertEquals(3, prior.getModels().size());
+    System.out.println("Prior");
+    for (Cluster cluster : prior.getModels()) {
+      System.out.println(cluster.asFormatString(null));
+    }
+    ClusteringPolicy policy = new KMeansClusteringPolicy();
+    ClusterIterator iterator = new ClusterIterator(policy);
+    iterator.iterate(pointsPath, path, outPath, 5);
+    
+    for (int i = 1; i <= 5; i++) {
+      System.out.println("Classifier-" + i);
+      ClusterClassifier posterior = readClassifier(conf, new Path(outPath,
+          "classifier-" + i), fs);
+      assertEquals(3, posterior.getModels().size());
+      for (Cluster cluster : posterior.getModels()) {
+        System.out.println(cluster.asFormatString(null));
+      }
+      
     }
   }
 }

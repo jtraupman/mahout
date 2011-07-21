@@ -17,13 +17,14 @@
 
 package org.apache.mahout.cf.taste.example.kddcup.track1.svd;
 
+import com.google.common.collect.Lists;
+import org.apache.mahout.cf.taste.common.TasteException;
 import org.apache.mahout.cf.taste.impl.common.FastIDSet;
 import org.apache.mahout.cf.taste.impl.common.LongPrimitiveIterator;
 import org.apache.mahout.cf.taste.impl.model.GenericPreference;
 import org.apache.mahout.cf.taste.model.DataModel;
 import org.apache.mahout.cf.taste.model.Preference;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -47,7 +48,7 @@ public class DataModelFactorizablePreferences implements FactorizablePreferences
     try {
       userIDs = new FastIDSet(dataModel.getNumUsers());
       itemIDs = new FastIDSet(dataModel.getNumItems());
-      preferences = new ArrayList<Preference>();
+      preferences = Lists.newArrayList();
 
       LongPrimitiveIterator userIDsIterator = dataModel.getUserIDs();
       while (userIDsIterator.hasNext()) {
@@ -58,8 +59,8 @@ public class DataModelFactorizablePreferences implements FactorizablePreferences
           preferences.add(new GenericPreference(userID, preference.getItemID(), preference.getValue()));
         }
       }
-    } catch (Exception e) {
-      throw new IllegalStateException("Unable to create factorizable preferences!", e);
+    } catch (TasteException te) {
+      throw new IllegalStateException("Unable to create factorizable preferences!", te);
     }
   }
 

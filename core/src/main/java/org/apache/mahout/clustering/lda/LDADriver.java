@@ -18,6 +18,7 @@
 package org.apache.mahout.clustering.lda;
 
 import com.google.common.base.Preconditions;
+import com.google.common.io.Closeables;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -50,9 +51,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Random;
 
 /**
@@ -78,8 +79,6 @@ public final class LDADriver extends AbstractJob {
 
   private LDAState state = null;
 
-  private LDAState newState = null;
-
   private LDAInference inference = null;
 
   private Iterable<Pair<Writable, VectorWritable>> trainingCorpus = null;
@@ -91,11 +90,11 @@ public final class LDADriver extends AbstractJob {
     ToolRunner.run(new Configuration(), new LDADriver(), args);
   }
 
-  public static LDAState createState(Configuration job) throws IOException {
+  public static LDAState createState(Configuration job) {
     return createState(job, false);
   }
 
-  public static LDAState createState(Configuration job, boolean empty) throws IOException {
+  public static LDAState createState(Configuration job, boolean empty) {
     String statePath = job.get(STATE_IN_KEY);
     int numTopics = Integer.parseInt(job.get(NUM_TOPICS_KEY));
     int numWords = Integer.parseInt(job.get(NUM_WORDS_KEY));
@@ -108,7 +107,7 @@ public final class LDADriver extends AbstractJob {
     double[] logTotals = new double[numTopics];
     Arrays.fill(logTotals, Double.NEGATIVE_INFINITY);
     double ll = 0.0;
-    if(empty) {
+    if (empty) {
       return new LDAState(numTopics, numWords, topicSmoothing, pWgT, logTotals, ll);
     }
     for (Pair<IntPairWritable,DoubleWritable> record
@@ -177,11 +176,11 @@ public final class LDADriver extends AbstractJob {
     return 0;
   }
 
-  private Path getLastKnownStatePath(Configuration conf, Path stateDir) throws IOException {
+  private static Path getLastKnownStatePath(Configuration conf, Path stateDir) throws IOException {
     FileSystem fs = FileSystem.get(conf);
     Path lastPath = null;
     int maxIteration = Integer.MIN_VALUE;
-    for(FileStatus fstatus : fs.globStatus(new Path(stateDir, "state-*"))) {
+    for (FileStatus fstatus : fs.globStatus(new Path(stateDir, "state-*"))) {
       try {
         int iteration = Integer.parseInt(fstatus.getPath().getName().split("-")[1]);
         if(iteration > maxIteration) {
@@ -206,7 +205,7 @@ public final class LDADriver extends AbstractJob {
     throws IOException, InterruptedException, ClassNotFoundException {
     Path lastKnownState = getLastKnownStatePath(conf, output);
     Path stateIn;
-    if(lastKnownState == null) {
+    if (lastKnownState == null) {
       stateIn = new Path(output, "state-0");
       writeInitialState(stateIn, numTopics, numWords);
     } else {
@@ -224,7 +223,9 @@ public final class LDADriver extends AbstractJob {
       conf.set(STATE_IN_KEY, stateIn.toString());
       // point the output to a new directory per iteration
       Path stateOut = new Path(output, "state-" + iteration);
-      double ll = runSequential ? runIterationSequential(conf, input, stateOut) : runIteration(conf, input, stateIn, stateOut);
+      double ll = runSequential
+          ? runIterationSequential(conf, input, stateOut)
+          : runIteration(conf, input, stateIn, stateOut);
       double relChange = (oldLL - ll) / oldLL;
 
       // now point the input to the old output directory
@@ -239,11 +240,17 @@ public final class LDADriver extends AbstractJob {
     if(runSequential) {
       computeDocumentTopicProbabilitiesSequential(conf, input, new Path(output, "docTopics"));
     } else {
-      computeDocumentTopicProbabilities(conf, input, stateIn, new Path(output, "docTopics"), numTopics, numWords, topicSmoothing);
+      computeDocumentTopicProbabilities(conf,
+                                        input,
+                                        stateIn,
+                                        new Path(output, "docTopics"),
+                                        numTopics,
+                                        numWords,
+                                        topicSmoothing);
     }
   }
 
-  private void writeInitialState(Path statePath, int numTopics, int numWords) throws IOException {
+  private static void writeInitialState(Path statePath, int numTopics, int numWords) throws IOException {
     Configuration job = new Configuration();
     FileSystem fs = statePath.getFileSystem(job);
 
@@ -255,24 +262,26 @@ public final class LDADriver extends AbstractJob {
       Path path = new Path(statePath, "part-" + k);
       SequenceFile.Writer writer = new SequenceFile.Writer(fs, job, path, IntPairWritable.class, DoubleWritable.class);
 
-      double total = 0.0; // total number of pseudo counts we made
-      for (int w = 0; w < numWords; ++w) {
-        Writable kw = new IntPairWritable(k, w);
-        // A small amount of random noise, minimized by having a floor.
-        double pseudocount = random.nextDouble() + 1.0E-8;
-        total += pseudocount;
-        v.set(Math.log(pseudocount));
-        writer.append(kw, v);
+      try {
+        double total = 0.0; // total number of pseudo counts we made
+        for (int w = 0; w < numWords; ++w) {
+          Writable kw = new IntPairWritable(k, w);
+          // A small amount of random noise, minimized by having a floor.
+          double pseudocount = random.nextDouble() + 1.0E-8;
+          total += pseudocount;
+          v.set(Math.log(pseudocount));
+          writer.append(kw, v);
+        }
+        Writable kTsk = new IntPairWritable(k, TOPIC_SUM_KEY);
+        v.set(Math.log(total));
+        writer.append(kTsk, v);
+      } finally {
+        Closeables.closeQuietly(writer);
       }
-      Writable kTsk = new IntPairWritable(k, TOPIC_SUM_KEY);
-      v.set(Math.log(total));
-      writer.append(kTsk, v);
-
-      writer.close();
     }
   }
 
-  private void writeState(Configuration job, LDAState state, Path statePath) throws IOException {
+  private static void writeState(Configuration job, LDAState state, Path statePath) throws IOException {
     FileSystem fs = statePath.getFileSystem(job);
     DoubleWritable v = new DoubleWritable();
 
@@ -280,57 +289,65 @@ public final class LDADriver extends AbstractJob {
       Path path = new Path(statePath, "part-" + k);
       SequenceFile.Writer writer = new SequenceFile.Writer(fs, job, path, IntPairWritable.class, DoubleWritable.class);
 
-      for (int w = 0; w < state.getNumWords(); ++w) {
-        Writable kw = new IntPairWritable(k, w);
-        v.set(state.logProbWordGivenTopic(w,k) + state.getLogTotal(k));
-        writer.append(kw, v);
+      try {
+        for (int w = 0; w < state.getNumWords(); ++w) {
+          Writable kw = new IntPairWritable(k, w);
+          v.set(state.logProbWordGivenTopic(w,k) + state.getLogTotal(k));
+          writer.append(kw, v);
+        }
+        Writable kTsk = new IntPairWritable(k, TOPIC_SUM_KEY);
+        v.set(state.getLogTotal(k));
+        writer.append(kTsk, v);
+      } finally {
+        Closeables.closeQuietly(writer);
       }
-      Writable kTsk = new IntPairWritable(k, TOPIC_SUM_KEY);
-      v.set(state.getLogTotal(k));
-      writer.append(kTsk, v);
-      writer.close();
     }
     Path path = new Path(statePath, "part-" + LOG_LIKELIHOOD_KEY);
     SequenceFile.Writer writer = new SequenceFile.Writer(fs, job, path, IntPairWritable.class, DoubleWritable.class);
-    Writable kTsk = new IntPairWritable(LOG_LIKELIHOOD_KEY,LOG_LIKELIHOOD_KEY);
-    v.set(state.getLogLikelihood());
-    writer.append(kTsk, v);
-    writer.close();
+    try {
+      Writable kTsk = new IntPairWritable(LOG_LIKELIHOOD_KEY,LOG_LIKELIHOOD_KEY);
+      v.set(state.getLogLikelihood());
+      writer.append(kTsk, v);
+    } finally {
+      Closeables.closeQuietly(writer);
+    }
   }
 
-  private double findLL(Path statePath, Configuration job) throws IOException {
+  private static double findLL(Path statePath, Configuration job) throws IOException {
     FileSystem fs = statePath.getFileSystem(job);
     double ll = 0.0;
     for (FileStatus status : fs.globStatus(new Path(statePath, "part-*"))) {
       Path path = status.getPath();
       SequenceFileIterator<IntPairWritable,DoubleWritable> iterator =
           new SequenceFileIterator<IntPairWritable,DoubleWritable>(path, true, job);
-      while (iterator.hasNext()) {
-        Pair<IntPairWritable,DoubleWritable> record = iterator.next();
-        if (record.getFirst().getFirst() == LOG_LIKELIHOOD_KEY) {
-          ll = record.getSecond().get();
-          break;
+      try {
+        while (iterator.hasNext()) {
+          Pair<IntPairWritable,DoubleWritable> record = iterator.next();
+          if (record.getFirst().getFirst() == LOG_LIKELIHOOD_KEY) {
+            ll = record.getSecond().get();
+            break;
+          }
         }
+      } finally {
+        Closeables.closeQuietly(iterator);
       }
-      iterator.close();
     }
     return ll;
   }
 
-  private double runIterationSequential(Configuration conf, Path input, Path stateOut)
-    throws IOException, InterruptedException {
-    if(state == null) {
+  private double runIterationSequential(Configuration conf, Path input, Path stateOut) throws IOException {
+    if (state == null) {
       state = createState(conf);
     }
-    if(trainingCorpus == null) {
+    if (trainingCorpus == null) {
       Class<? extends Writable> keyClass = peekAtSequenceFileForKeyType(conf, input);
-      List<Pair<Writable,VectorWritable>> corpus = new LinkedList<Pair<Writable, VectorWritable>>();
-      for(FileStatus fileStatus : FileSystem.get(conf).globStatus(new Path(input, "part-*"))) {
+      Collection<Pair<Writable, VectorWritable>> corpus = new LinkedList<Pair<Writable, VectorWritable>>();
+      for (FileStatus fileStatus : FileSystem.get(conf).globStatus(new Path(input, "part-*"))) {
         Path inputPart = fileStatus.getPath();
         SequenceFile.Reader reader = new SequenceFile.Reader(FileSystem.get(conf), inputPart, conf);
         Writable key = ReflectionUtils.newInstance(keyClass, conf);
         VectorWritable value = new VectorWritable();
-        while(reader.next(key, value)) {
+        while (reader.next(key, value)) {
           Writable nextKey = ReflectionUtils.newInstance(keyClass, conf);
           VectorWritable nextValue = new VectorWritable();
           corpus.add(new Pair<Writable,VectorWritable>(key, value));
@@ -340,12 +357,12 @@ public final class LDADriver extends AbstractJob {
       }
       trainingCorpus = corpus;
     }
-    if(inference == null) {
+    if (inference == null) {
       inference = new LDAInference(state);
     }
-    double ll = 0;
-    newState = createState(conf, true);
-    for(Pair<Writable, VectorWritable> slice : trainingCorpus) {
+    LDAState newState = createState(conf, true);
+    double ll = 0.0;
+    for (Pair<Writable, VectorWritable> slice : trainingCorpus) {
       LDAInference.InferredDocument doc;
       Vector wordCounts = slice.getSecond().get();
       try {
@@ -386,7 +403,7 @@ public final class LDADriver extends AbstractJob {
    * @param stateOut
    *          the directory pathname for output state
    */
-  private double runIteration(Configuration conf,
+  private static double runIteration(Configuration conf,
                                      Path input,
                                      Path stateIn,
                                      Path stateOut)
@@ -412,13 +429,13 @@ public final class LDADriver extends AbstractJob {
     return findLL(stateOut, conf);
   }
 
-  private void computeDocumentTopicProbabilities(Configuration conf,
-                                     Path input,
-                                     Path stateIn,
-                                     Path outputPath,
-                                     int numTopics,
-                                     int numWords,
-                                     double topicSmoothing)
+  private static void computeDocumentTopicProbabilities(Configuration conf,
+                                                        Path input,
+                                                        Path stateIn,
+                                                        Path outputPath,
+                                                        int numTopics,
+                                                        int numWords,
+                                                        double topicSmoothing)
     throws IOException, InterruptedException, ClassNotFoundException {
     conf.set(STATE_IN_KEY, stateIn.toString());
     conf.set(NUM_TOPICS_KEY, Integer.toString(numTopics));
@@ -437,42 +454,43 @@ public final class LDADriver extends AbstractJob {
     job.setInputFormatClass(SequenceFileInputFormat.class);
     job.setJarByClass(LDADriver.class);
 
-    if (job.waitForCompletion(true) == false) {
+    if (!job.waitForCompletion(true)) {
       throw new InterruptedException("LDA failed to compute and output document topic probabilities with: "+ stateIn);
     }
   }
 
   private void computeDocumentTopicProbabilitiesSequential(Configuration conf, Path input, Path outputPath)
-    throws IOException, ClassNotFoundException {
+    throws IOException {
     FileSystem fs = input.getFileSystem(conf);
     Class<? extends Writable> keyClass = peekAtSequenceFileForKeyType(conf, input);
     SequenceFile.Writer writer = new SequenceFile.Writer(fs, conf, outputPath, keyClass, VectorWritable.class);
 
-    Writable key = ReflectionUtils.newInstance(keyClass, conf);
-    VectorWritable vw = new VectorWritable();
+    try {
+      Writable key = ReflectionUtils.newInstance(keyClass, conf);
+      Writable vw = new VectorWritable();
 
-    for(Pair<Writable, VectorWritable> slice : trainingCorpus) {
-      LDAInference.InferredDocument doc;
-      Vector wordCounts = slice.getSecond().get();
-      try {
-        doc = inference.infer(wordCounts);
-      } catch (ArrayIndexOutOfBoundsException e1) {
-        throw new IllegalStateException(
-         "This is probably because the --numWords argument is set too small.  \n"
-         + "\tIt needs to be >= than the number of words (terms actually) in the corpus and can be \n"
-         + "\tlarger if some storage inefficiency can be tolerated.", e1);
+      for (Pair<Writable, VectorWritable> slice : trainingCorpus) {
+        Vector wordCounts = slice.getSecond().get();
+        try {
+          inference.infer(wordCounts);
+        } catch (ArrayIndexOutOfBoundsException e1) {
+          throw new IllegalStateException(
+           "This is probably because the --numWords argument is set too small.  \n"
+           + "\tIt needs to be >= than the number of words (terms actually) in the corpus and can be \n"
+           + "\tlarger if some storage inefficiency can be tolerated.", e1);
+        }
+        writer.append(key, vw);
       }
-      writer.append(key, vw);
+    } finally {
+      Closeables.closeQuietly(writer);
     }
-
-    writer.close();
   }
 
   private static Class<? extends Writable> peekAtSequenceFileForKeyType(Configuration conf, Path input) {
     try {
       SequenceFile.Reader reader = new SequenceFile.Reader(FileSystem.get(conf), input, conf);
       return (Class<? extends Writable>) reader.getKeyClass();
-    } catch(IOException ioe) {
+    } catch (IOException ioe) {
       return Text.class;
     }
   }

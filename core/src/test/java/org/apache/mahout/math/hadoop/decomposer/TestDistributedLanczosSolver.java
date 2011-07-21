@@ -20,6 +20,7 @@ package org.apache.mahout.math.hadoop.decomposer;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.mahout.common.MahoutTestCase;
 import org.apache.mahout.math.Vector;
 import org.apache.mahout.math.decomposer.SolverTest;
 import org.apache.mahout.math.decomposer.lanczos.LanczosState;
@@ -50,25 +51,25 @@ public final class TestDistributedLanczosSolver extends SolverTest {
   }
 
   protected final Path getTestTempDirPath() throws IOException {
-    FileSystem fs = null;
-    if (testTempDirPath == null) {
-      fs = FileSystem.get(new Configuration());
-      long simpleRandomLong = (long) (Long.MAX_VALUE * Math.random());
-      testTempDirPath = fs.makeQualified(
-          new Path("/tmp/mahout-" + getClass().getSimpleName() + '-' + simpleRandomLong));
-      if (!fs.mkdirs(testTempDirPath)) {
-        throw new IOException("Could not create " + testTempDirPath);
-      }
-      fs.deleteOnExit(testTempDirPath);
-    }
-    return testTempDirPath;
+	  FileSystem fs = null;
+	  if (testTempDirPath == null) {
+		  fs = FileSystem.get(new Configuration());
+		  long simpleRandomLong = (long) (Long.MAX_VALUE * Math.random());
+		  testTempDirPath = fs.makeQualified(
+				  new Path("/tmp/mahout-" + getClass().getSimpleName() + '-' + simpleRandomLong));
+		  if (!fs.mkdirs(testTempDirPath)) {
+			  throw new IOException("Could not create " + testTempDirPath);
+		  }
+		  fs.deleteOnExit(testTempDirPath);
+	  }
+	  return testTempDirPath;
+  }  
+  
+  private static String suf(boolean symmetric) {
+    return symmetric ? "_sym" : "_asym";
   }
 
-  private String suf(boolean symmetric) {
-    return (symmetric ? "_sym" : "_asym");
-  }
-
-  private DistributedRowMatrix getCorpus(boolean symmetric) throws IOException {
+  private DistributedRowMatrix getCorpus(boolean symmetric) {
     return symmetric ? symCorpus : asymCorpus;
   }
 
@@ -98,7 +99,7 @@ public final class TestDistributedLanczosSolver extends SolverTest {
     solver.solve(state, desiredRank);
     assertOrthonormal(state);
     for(int i = 0; i < desiredRank/2; i++) {
-      assertEigen(i, state.getRightSingularVector(i), corpus, 0.1, symmetric);
+      SolverTest.assertEigen(i, state.getRightSingularVector(i), corpus, 0.1, symmetric);
     }
     counter++;
     return state;

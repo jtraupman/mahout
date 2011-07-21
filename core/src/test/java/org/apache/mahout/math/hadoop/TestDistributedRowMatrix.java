@@ -17,12 +17,16 @@
 
 package org.apache.mahout.math.hadoop;
 
+import com.google.common.base.Function;
+import com.google.common.collect.Iterators;
+import com.google.common.collect.Maps;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.mahout.clustering.ClusteringTestUtils;
 import org.apache.mahout.common.MahoutTestCase;
+import org.apache.mahout.common.iterator.sequencefile.PathFilters;
 import org.apache.mahout.math.Matrix;
 import org.apache.mahout.math.MatrixSlice;
 import org.apache.mahout.math.RandomAccessSparseVector;
@@ -33,7 +37,6 @@ import org.apache.mahout.math.decomposer.SolverTest;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -44,8 +47,8 @@ public final class TestDistributedRowMatrix extends MahoutTestCase {
   private static void assertEquals(VectorIterable m, VectorIterable mtt, double errorTolerance) {
     Iterator<MatrixSlice> mIt = m.iterateAll();
     Iterator<MatrixSlice> mttIt = mtt.iterateAll();
-    Map<Integer, Vector> mMap = new HashMap<Integer,Vector>();
-    Map<Integer, Vector> mttMap = new HashMap<Integer, Vector>();
+    Map<Integer, Vector> mMap = Maps.newHashMap();
+    Map<Integer, Vector> mttMap = Maps.newHashMap();
     while (mIt.hasNext() && mttIt.hasNext()) {
       MatrixSlice ms = mIt.next();
       mMap.put(ms.index(), ms.vector());
@@ -69,7 +72,10 @@ public final class TestDistributedRowMatrix extends MahoutTestCase {
   public void testTranspose() throws Exception {
     DistributedRowMatrix m = randomDistributedMatrix(10, 9, 5, 4, 1.0, false);
     DistributedRowMatrix mt = m.transpose();
-    mt.setOutputTempPathString(new Path(m.getOutputTempPath().getParent(), "/tmpOutTranspose").toString());
+
+    Path tmpPath = getTestTempDirPath();
+    m.setOutputTempPathString(tmpPath.toString());
+    mt.setOutputTempPathString(new Path(tmpPath, "/tmpOutTranspose").toString());
     DistributedRowMatrix mtt = mt.transpose();
     assertEquals(m, mtt, EPSILON);
   }
@@ -232,8 +238,8 @@ public final class TestDistributedRowMatrix extends MahoutTestCase {
     Path outputTempPath = outputStatuses[0].getPath();
     Path inputVectorPath = new Path(outputTempPath, TimesSquaredJob.INPUT_VECTOR);
     Path outputVectorPath = new Path(outputTempPath, TimesSquaredJob.OUTPUT_VECTOR_FILENAME);
-    assertEquals(1, fs.listStatus(inputVectorPath).length);
-    assertEquals(1, fs.listStatus(outputVectorPath).length);
+    assertEquals(1, fs.listStatus(inputVectorPath, PathFilters.logsCRCFilter()).length);
+    assertEquals(1, fs.listStatus(outputVectorPath, PathFilters.logsCRCFilter()).length);
 
     assertEquals(0.0, result1.getDistanceSquared(result2), EPSILON);
   }
@@ -269,19 +275,19 @@ public final class TestDistributedRowMatrix extends MahoutTestCase {
     Path outputTempPath = outputStatuses[0].getPath();
     Path inputVectorPath = new Path(outputTempPath, TimesSquaredJob.INPUT_VECTOR);
     Path outputVectorPath = new Path(outputTempPath, TimesSquaredJob.OUTPUT_VECTOR_FILENAME);
-    assertEquals(1, fs.listStatus(inputVectorPath).length);
-    assertEquals(1, fs.listStatus(outputVectorPath).length);
+    assertEquals(1, fs.listStatus(inputVectorPath, PathFilters.logsCRCFilter()).length);
+    assertEquals(1, fs.listStatus(outputVectorPath, PathFilters.logsCRCFilter()).length);
     
     assertEquals(0.0, result1.getDistanceSquared(result2), EPSILON);
   }
 
-  public Configuration createInitialConf() {
+  public static Configuration createInitialConf() {
     Configuration initialConf = new Configuration();
     initialConf.set(TEST_PROPERTY_KEY, TEST_PROPERTY_VALUE);
     return initialConf;
   }
-  
-  private void deleteContentsOfPath(Configuration conf, Path path) throws Exception {
+
+  private static void deleteContentsOfPath(Configuration conf, Path path) throws Exception {
     FileSystem fs = path.getFileSystem(conf);
     
     FileStatus[] statuses = fs.listStatus(path);
@@ -325,28 +331,18 @@ public final class TestDistributedRowMatrix extends MahoutTestCase {
   }
 
   private static DistributedRowMatrix saveToFs(final Matrix m, Path baseTmpDirPath) throws IOException {
-        Configuration conf = new Configuration();
+    Configuration conf = new Configuration();
     FileSystem fs = FileSystem.get(conf);
 
     ClusteringTestUtils.writePointsToFile(new Iterable<VectorWritable>() {
       @Override
       public Iterator<VectorWritable> iterator() {
-        final Iterator<MatrixSlice> it = m.iterator();
-        return new Iterator<VectorWritable>() {
+        return Iterators.transform(m.iterator(), new Function<MatrixSlice,VectorWritable>() {
           @Override
-          public boolean hasNext() {
-            return it.hasNext();
+          public VectorWritable apply(MatrixSlice input) {
+            return new VectorWritable(input.vector());
           }
-          @Override
-          public VectorWritable next() {
-            MatrixSlice slice = it.next();
-            return new VectorWritable(slice.vector());
-          }
-          @Override
-          public void remove() {
-            it.remove();
-          }
-        };
+        });
       }
     }, true, new Path(baseTmpDirPath, "distMatrix/part-00000"), fs, conf);
 

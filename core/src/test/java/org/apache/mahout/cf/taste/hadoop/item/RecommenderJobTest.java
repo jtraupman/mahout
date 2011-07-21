@@ -21,16 +21,17 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import com.google.common.collect.Maps;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Counter;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.mahout.cf.taste.hadoop.EntityPrefWritable;
@@ -52,7 +53,7 @@ import org.apache.mahout.math.hadoop.similarity.vector.DistributedCooccurrenceVe
 import org.apache.mahout.math.hadoop.similarity.vector.DistributedTanimotoCoefficientVectorSimilarity;
 import org.apache.mahout.math.map.OpenIntLongHashMap;
 import org.easymock.IArgumentMatcher;
-import org.easymock.classextension.EasyMock;
+import org.easymock.EasyMock;
 import org.junit.Test;
 
 public class RecommenderJobTest extends TasteTestCase {
@@ -136,11 +137,14 @@ public class RecommenderJobTest extends TasteTestCase {
   public void testToUserVectorReducer() throws Exception {
     Reducer<VarLongWritable,VarLongWritable,VarLongWritable,VectorWritable>.Context context =
       EasyMock.createMock(Reducer.Context.class);
+    Counter userCounters = EasyMock.createMock(Counter.class);
 
+    EasyMock.expect(context.getCounter(ToUserVectorReducer.Counters.USERS)).andReturn(userCounters);
+    userCounters.increment(1);
     context.write(EasyMock.eq(new VarLongWritable(12L)), MathHelper.vectorMatches(
         MathHelper.elem(TasteHadoopUtils.idToIndex(34L), 1.0), MathHelper.elem(TasteHadoopUtils.idToIndex(56L), 2.0)));
 
-    EasyMock.replay(context);
+    EasyMock.replay(context, userCounters);
 
     Collection<VarLongWritable> varLongWritables = new LinkedList<VarLongWritable>();
     varLongWritables.add(new EntityPrefWritable(34L, 1.0f));
@@ -148,7 +152,7 @@ public class RecommenderJobTest extends TasteTestCase {
 
     new ToUserVectorReducer().reduce(new VarLongWritable(12L), varLongWritables, context);
 
-    EasyMock.verify(context);
+    EasyMock.verify(context, userCounters);
   }
 
   /**
@@ -158,16 +162,19 @@ public class RecommenderJobTest extends TasteTestCase {
   public void testToUserVectorReducerWithBooleanData() throws Exception {
     Reducer<VarLongWritable,VarLongWritable,VarLongWritable,VectorWritable>.Context context =
       EasyMock.createMock(Reducer.Context.class);
+    Counter userCounters = EasyMock.createMock(Counter.class);
 
+    EasyMock.expect(context.getCounter(ToUserVectorReducer.Counters.USERS)).andReturn(userCounters);
+    userCounters.increment(1);
     context.write(EasyMock.eq(new VarLongWritable(12L)), MathHelper.vectorMatches(
         MathHelper.elem(TasteHadoopUtils.idToIndex(34L), 1.0), MathHelper.elem(TasteHadoopUtils.idToIndex(56L), 1.0)));
 
-    EasyMock.replay(context);
+    EasyMock.replay(context, userCounters);
 
     new ToUserVectorReducer().reduce(new VarLongWritable(12L), Arrays.asList(new VarLongWritable(34L),
         new VarLongWritable(56L)), context);
 
-    EasyMock.verify(context);
+    EasyMock.verify(context, userCounters);
   }
 
   /**
@@ -246,7 +253,7 @@ public class RecommenderJobTest extends TasteTestCase {
       @Override
       public boolean matches(Object argument) {
         if (argument instanceof VectorOrPrefWritable) {
-          VectorOrPrefWritable pref = ((VectorOrPrefWritable) argument);
+          VectorOrPrefWritable pref = (VectorOrPrefWritable) argument;
           return pref.getUserID() == userID && pref.getValue() == prefValue;
         }
         return false;
@@ -323,7 +330,7 @@ public class RecommenderJobTest extends TasteTestCase {
       @Override
       public boolean matches(Object argument) {
         if (argument instanceof VectorOrPrefWritable) {
-          VectorOrPrefWritable pref = ((VectorOrPrefWritable) argument);
+          VectorOrPrefWritable pref = (VectorOrPrefWritable) argument;
           return pref.getUserID() == userID && Float.isNaN(pref.getValue());
         }
         return false;
@@ -371,7 +378,7 @@ public class RecommenderJobTest extends TasteTestCase {
       @Override
       public boolean matches(Object argument) {
         if (argument instanceof VectorAndPrefsWritable) {
-          VectorAndPrefsWritable vectorAndPrefs = ((VectorAndPrefsWritable) argument);
+          VectorAndPrefsWritable vectorAndPrefs = (VectorAndPrefsWritable) argument;
 
           if (!vectorAndPrefs.getUserIDs().equals(userIDs)) {
             return false;
@@ -643,7 +650,7 @@ public class RecommenderJobTest extends TasteTestCase {
       @Override
       public boolean matches(Object argument) {
         if (argument instanceof RecommendedItemsWritable) {
-          RecommendedItemsWritable recommendedItemsWritable = ((RecommendedItemsWritable) argument);
+          RecommendedItemsWritable recommendedItemsWritable = (RecommendedItemsWritable) argument;
           List<RecommendedItem> expectedItems = new LinkedList<RecommendedItem>(Arrays.asList(items));
           return expectedItems.equals(recommendedItemsWritable.getRecommendedItems());
         }
@@ -875,7 +882,7 @@ public class RecommenderJobTest extends TasteTestCase {
 
 
   static Map<Long,List<RecommendedItem>> readRecommendations(File file) throws IOException {
-    Map<Long,List<RecommendedItem>> recommendations = new HashMap<Long,List<RecommendedItem>>();
+    Map<Long,List<RecommendedItem>> recommendations = Maps.newHashMap();
     Iterable<String> lineIterable = new FileLineIterable(file);
     for (String line : lineIterable) {
 

@@ -17,15 +17,19 @@
 
 package org.apache.mahout.ga.watchmaker.cd;
 
-import java.util.ArrayList;
+import com.google.common.collect.Lists;
+
+import java.util.Collections;
 import java.util.List;
-import java.util.StringTokenizer;
+import java.util.regex.Pattern;
 
 /**
  * Represents one line of a Dataset. Contains only real attributs.
  */
 public class DataLine {
-  
+
+  private static final Pattern COMMA = Pattern.compile(",");
+
   private final double[] attributes;
   
   public DataLine() {
@@ -33,7 +37,7 @@ public class DataLine {
     attributes = new double[nba];
   }
   
-  public DataLine(String dl) {
+  public DataLine(CharSequence dl) {
     this();
     set(dl);
   }
@@ -47,16 +51,13 @@ public class DataLine {
     return attributes[index];
   }
   
-  public void set(String dlstr) {
+  public void set(CharSequence dlstr) {
     DataSet dataset = DataSet.getDataSet();
     
     // extract tokens
-    StringTokenizer tokenizer = new StringTokenizer(dlstr, ",");
-    List<String> tokens = new ArrayList<String>();
-    while (tokenizer.hasMoreTokens()) {
-      tokens.add(tokenizer.nextToken());
-    }
-    
+    List<String> tokens = Lists.newArrayList();
+    Collections.addAll(tokens, COMMA.split(dlstr));
+
     // remove any ignored attribute
     List<Integer> ignored = dataset.getIgnoredAttributes();
     for (int index = ignored.size() - 1; index >= 0; index--) {

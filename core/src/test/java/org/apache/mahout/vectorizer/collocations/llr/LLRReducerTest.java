@@ -32,7 +32,7 @@ import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.mahout.common.MahoutTestCase;
 import org.apache.mahout.math.stats.LogLikelihood;
 import org.apache.mahout.vectorizer.collocations.llr.LLRReducer.LLCallback;
-import org.easymock.classextension.EasyMock;
+import org.easymock.EasyMock;
 import org.junit.Before;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -59,7 +59,7 @@ public final class LLRReducerTest extends MahoutTestCase {
     ll        = EasyMock.createMock(LLCallback.class);
     cl        = new LLCallback() {
       @Override
-      public double logLikelihoodRatio(int k11, int k12, int k21, int k22) {
+      public double logLikelihoodRatio(long k11, long k12, long k21, long k22) {
         log.info("k11:{} k12:{} k21:{} k22:{}", new Object[] {k11, k12, k21, k22});
         return LogLikelihood.logLikelihoodRatio(k11, k12, k21, k22);
       }

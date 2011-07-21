@@ -1,14 +1,13 @@
 package org.apache.mahout.math.decomposer.lanczos;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import org.apache.mahout.math.CardinalityException;
+import com.google.common.collect.Maps;
 import org.apache.mahout.math.DenseMatrix;
 import org.apache.mahout.math.LinearOperator;
 import org.apache.mahout.math.Matrix;
 import org.apache.mahout.math.SquaredLinearOperator;
 import org.apache.mahout.math.Vector;
+import java.util.Map;
 
 public class LanczosState {
   protected boolean isSymmetric;
@@ -39,13 +38,13 @@ public class LanczosState {
     setBasisVector(0, initialVector);
     scaleFactor = 0;
     diagonalMatrix = new DenseMatrix(desiredRank, desiredRank);
-    singularValues = new HashMap<Integer, Double>();
+    singularValues = Maps.newHashMap();
     iterationNumber = 1;
   }
 
   protected void intitializeBasisAndSingularVectors(int numCols, int rank) {
-    basis = new HashMap<Integer, Vector>();
-    singularVectors = new HashMap<Integer, Vector>();
+    basis = Maps.newHashMap();
+    singularVectors = Maps.newHashMap();
   }
 
   public Matrix getDiagonalMatrix() {

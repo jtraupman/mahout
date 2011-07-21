@@ -19,16 +19,18 @@ package org.apache.mahout.clustering.display;
 
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.util.ArrayList;
+import java.io.IOException;
+import java.util.Collection;
 import java.util.List;
 
+import com.google.common.collect.Lists;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.mahout.clustering.Cluster;
 import org.apache.mahout.clustering.ClusterClassifier;
 import org.apache.mahout.clustering.ClusterIterator;
 import org.apache.mahout.clustering.ClusteringPolicy;
 import org.apache.mahout.clustering.KMeansClusteringPolicy;
-import org.apache.mahout.clustering.Cluster;
 import org.apache.mahout.clustering.kmeans.KMeansDriver;
 import org.apache.mahout.clustering.kmeans.RandomSeedGenerator;
 import org.apache.mahout.common.HadoopUtil;
@@ -36,16 +38,12 @@ import org.apache.mahout.common.RandomUtils;
 import org.apache.mahout.common.distance.DistanceMeasure;
 import org.apache.mahout.common.distance.ManhattanDistanceMeasure;
 import org.apache.mahout.math.Vector;
-import org.apache.mahout.math.VectorWritable;
 
-class DisplayKMeans extends DisplayClustering {
-  
-  // static List<List<Cluster>> result;
-  
+public class DisplayKMeans extends DisplayClustering {
+
   DisplayKMeans() {
     initialize();
-    this.setTitle("k-Means Clusters (>" + (int) (significance * 100)
-        + "% of population)");
+    this.setTitle("k-Means Clusters (>" + (int) (significance * 100) + "% of population)");
   }
   
   public static void main(String[] args) throws Exception {
@@ -59,39 +57,57 @@ class DisplayKMeans extends DisplayClustering {
     RandomUtils.useTestSeed();
     DisplayClustering.generateSamples();
     writeSampleData(samples);
-    boolean b = false;
-    if (b) {
-      Path clusters = RandomSeedGenerator.buildRandom(conf, samples, new Path(
-          output, "clusters-0"), 3, measure);
-      int maxIter = 10;
-      double distanceThreshold = 0.001;
-      KMeansDriver.run(samples, clusters, output, measure, distanceThreshold,
-          maxIter, true, true);
-      loadClusters(output);
+    boolean runClusterer = false;
+    if (runClusterer) {
+      int numClusters = 3;
+      runSequentialKMeansClusterer(conf, samples, output, measure, numClusters);
     } else {
-      List<Vector> points = new ArrayList<Vector>();
-      for (VectorWritable sample : SAMPLE_DATA) {
-        points.add(sample.get());
-      }
-      List<Cluster> initialClusters = new ArrayList<Cluster>();
-      int id = 0;
-      int numClusters = 4;
-      for (Vector point : points) {
-        if (initialClusters.size() < Math.min(numClusters, points.size())) {
-          initialClusters.add(new org.apache.mahout.clustering.kmeans.Cluster(
-              point, id++, measure));
-        } else {
-          break;
-        }
-      }
-      
-      ClusterClassifier prior = new ClusterClassifier(initialClusters);
-      ClusteringPolicy policy = new KMeansClusteringPolicy();
-      ClusterClassifier posterior = new ClusterIterator(policy).iterate(points,
-          prior, 10);
-      CLUSTERS.add(posterior.getModels());
+      int maxIterations = 10;
+      runSequentialKMeansClassifier(conf, samples, output, measure, maxIterations);
     }
     new DisplayKMeans();
+  }
+  
+  private static void runSequentialKMeansClassifier(Configuration conf,
+                                                    Path samples,
+                                                    Path output,
+                                                    DistanceMeasure measure,
+                                                    int numClusters) throws IOException {
+    Collection<Vector> points = Lists.newArrayList();
+    for (int i = 0; i < numClusters; i++) {
+      points.add(SAMPLE_DATA.get(i).get());
+    }
+    List<Cluster> initialClusters = Lists.newArrayList();
+    int id = 0;
+    for (Vector point : points) {
+      initialClusters.add(new org.apache.mahout.clustering.kmeans.Cluster(
+          point, id++, measure));
+    }
+    ClusterClassifier prior = new ClusterClassifier(initialClusters);
+    Path priorClassifier = new Path(output, "clusters-0");
+    writeClassifier(prior, conf, priorClassifier);
+    
+    int maxIter = 10;
+    ClusteringPolicy policy = new KMeansClusteringPolicy();
+    new ClusterIterator(policy).iterate(samples, priorClassifier, output, maxIter);
+    for (int i = 1; i <= maxIter; i++) {
+      ClusterClassifier posterior = readClassifier(conf, new Path(output, "classifier-" + i));
+      CLUSTERS.add(posterior.getModels());
+    }
+  }
+  
+  private static void runSequentialKMeansClusterer(Configuration conf,
+                                                   Path samples,
+                                                   Path output,
+                                                   DistanceMeasure measure,
+                                                   int maxIterations)
+    throws IOException, InterruptedException, ClassNotFoundException {
+    Path clusters = RandomSeedGenerator.buildRandom(conf, samples, new Path(
+        output, "clusters-0"), 3, measure);
+    double distanceThreshold = 0.001;
+    KMeansDriver.run(samples, clusters, output, measure, distanceThreshold,
+        maxIterations, true, true);
+    loadClusters(output);
   }
   
   // Override the paint() method

@@ -17,18 +17,16 @@
 
 package org.apache.mahout.math;
 
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.NoSuchElementException;
-
+import com.google.common.collect.AbstractIterator;
+import com.google.common.collect.Maps;
 import org.apache.mahout.math.function.DoubleDoubleFunction;
 import org.apache.mahout.math.function.DoubleFunction;
 import org.apache.mahout.math.function.Functions;
 import org.apache.mahout.math.function.PlusMult;
 import org.apache.mahout.math.function.VectorFunction;
 
-import com.google.common.collect.Maps;
+import java.util.Iterator;
+import java.util.Map;
 
 /** A few universal implementations of convenience functions */
 public abstract class AbstractMatrix extends AbstractLinearOperator implements Matrix {
@@ -61,26 +59,15 @@ public abstract class AbstractMatrix extends AbstractLinearOperator implements M
 
   @Override
   public Iterator<MatrixSlice> iterateAll() {
-    return new Iterator<MatrixSlice>() {
+    return new AbstractIterator<MatrixSlice>() {
       private int slice;
-
       @Override
-      public boolean hasNext() {
-        return slice < numSlices();
-      }
-
-      @Override
-      public MatrixSlice next() {
+      protected MatrixSlice computeNext() {
         if (slice >= numSlices()) {
-          throw new NoSuchElementException();
+          return endOfData();
         }
         int i = slice++;
         return new MatrixSlice(slice(i), i);
-      }
-
-      @Override
-      public void remove() {
-        throw new UnsupportedOperationException("remove() not supported for Matrix iterator");
       }
     };
   }
@@ -142,7 +129,7 @@ public abstract class AbstractMatrix extends AbstractLinearOperator implements M
   @Override
   public void set(String rowLabel, int row, double[] rowData) {
     if (rowLabelBindings == null) {
-      rowLabelBindings = new HashMap<String, Integer>();
+      rowLabelBindings = Maps.newHashMap();
     }
     rowLabelBindings.put(rowLabel, row);
     set(row, rowData);
@@ -164,11 +151,11 @@ public abstract class AbstractMatrix extends AbstractLinearOperator implements M
   @Override
   public void set(String rowLabel, String columnLabel, int row, int column, double value) {
     if (rowLabelBindings == null) {
-      rowLabelBindings = new HashMap<String, Integer>();
+      rowLabelBindings = Maps.newHashMap();
     }
     rowLabelBindings.put(rowLabel, row);
     if (columnLabelBindings == null) {
-      columnLabelBindings = new HashMap<String, Integer>();
+      columnLabelBindings = Maps.newHashMap();
     }
     columnLabelBindings.put(columnLabel, column);
 
@@ -663,24 +650,14 @@ public abstract class AbstractMatrix extends AbstractLinearOperator implements M
 
     @Override
     public Iterator<Element> iterator() {
-      return new Iterator<Element>() {
+      return new AbstractIterator<Element>() {
         private int i;
         @Override
-        public boolean hasNext() {
-          return i < size();
-        }
-
-        @Override
-        public Element next() {
+        protected Element computeNext() {
           if (i >= size()) {
-            throw new NoSuchElementException();
+            return endOfData();
           }
           return getElement(i++);
-        }
-
-        @Override
-        public void remove() {
-          throw new UnsupportedOperationException("Element removal not supported");
         }
       };
     }

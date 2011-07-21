@@ -18,15 +18,12 @@
 package org.apache.mahout.cf.taste.hadoop.item;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
-import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
-import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.SequenceFileOutputFormat;
@@ -35,11 +32,7 @@ import org.apache.hadoop.util.ToolRunner;
 import org.apache.mahout.cf.taste.hadoop.EntityPrefWritable;
 import org.apache.mahout.cf.taste.hadoop.MaybePruneRowsMapper;
 import org.apache.mahout.cf.taste.hadoop.RecommendedItemsWritable;
-import org.apache.mahout.cf.taste.hadoop.TasteHadoopUtils;
 import org.apache.mahout.cf.taste.hadoop.ToItemPrefsMapper;
-import org.apache.mahout.cf.taste.hadoop.similarity.item.CountUsersKeyWritable;
-import org.apache.mahout.cf.taste.hadoop.similarity.item.CountUsersMapper;
-import org.apache.mahout.cf.taste.hadoop.similarity.item.CountUsersReducer;
 import org.apache.mahout.cf.taste.hadoop.similarity.item.ToItemVectorsReducer;
 import org.apache.mahout.common.AbstractJob;
 import org.apache.mahout.math.VarIntWritable;
@@ -135,7 +128,6 @@ public final class RecommenderJob extends AbstractJob {
 
     Path inputPath = getInputPath();
     Path outputPath = getOutputPath();
-    Path tempDirPath = new Path(parsedArgs.get("--tempDir"));
     int numRecommendations = Integer.parseInt(parsedArgs.get("--numRecommendations"));
     String usersFile = parsedArgs.get("--usersFile");
     String itemsFile = parsedArgs.get("--itemsFile");
@@ -147,15 +139,15 @@ public final class RecommenderJob extends AbstractJob {
     int maxCooccurrencesPerItem = Integer.parseInt(parsedArgs.get("--maxCooccurrencesPerItem"));
     String similarityClassname = parsedArgs.get("--similarityClassname");
 
-    Path userVectorPath = new Path(tempDirPath, "userVectors");
-    Path itemIDIndexPath = new Path(tempDirPath, "itemIDIndex");
-    Path countUsersPath = new Path(tempDirPath, "countUsers");
-    Path itemUserMatrixPath = new Path(tempDirPath, "itemUserMatrix");
-    Path similarityMatrixPath = new Path(tempDirPath, "similarityMatrix");
-    Path prePartialMultiplyPath1 = new Path(tempDirPath, "prePartialMultiply1");
-    Path prePartialMultiplyPath2 = new Path(tempDirPath, "prePartialMultiply2");
-    Path explicitFilterPath = new Path(tempDirPath, "explicitFilterPath");
-    Path partialMultiplyPath = new Path(tempDirPath, "partialMultiply");
+    Path userVectorPath = getTempPath("userVectors");
+    Path itemIDIndexPath = getTempPath("itemIDIndex");
+    Path countUsersPath = getTempPath("countUsers");
+    Path itemUserMatrixPath = getTempPath("itemUserMatrix");
+    Path similarityMatrixPath = getTempPath("similarityMatrix");
+    Path prePartialMultiplyPath1 = getTempPath("prePartialMultiply1");
+    Path prePartialMultiplyPath2 = getTempPath("prePartialMultiply2");
+    Path explicitFilterPath = getTempPath("explicitFilterPath");
+    Path partialMultiplyPath = getTempPath("partialMultiply");
 
     AtomicInteger currentPhase = new AtomicInteger();
 
@@ -169,6 +161,7 @@ public final class RecommenderJob extends AbstractJob {
       itemIDIndex.waitForCompletion(true);
     }
 
+    int numberOfUsers = 0;
     if (shouldRunNextPhase(parsedArgs, currentPhase)) {
       Job toUserVector = prepareJob(
         inputPath, userVectorPath, TextInputFormat.class,
@@ -178,22 +171,8 @@ public final class RecommenderJob extends AbstractJob {
       toUserVector.getConfiguration().setBoolean(BOOLEAN_DATA, booleanData);
       toUserVector.getConfiguration().setInt(ToUserVectorReducer.MIN_PREFERENCES_PER_USER, minPrefsPerUser);
       toUserVector.waitForCompletion(true);
-    }
 
-    if (shouldRunNextPhase(parsedArgs, currentPhase)) {
-      Job countUsers = prepareJob(userVectorPath,
-                                  countUsersPath,
-                                  SequenceFileInputFormat.class,
-                                  CountUsersMapper.class,
-                                  CountUsersKeyWritable.class,
-                                  VarLongWritable.class,
-                                  CountUsersReducer.class,
-                                  VarIntWritable.class,
-                                  NullWritable.class,
-                                  TextOutputFormat.class);
-      countUsers.setPartitionerClass(CountUsersKeyWritable.CountUsersPartitioner.class);
-      countUsers.setGroupingComparatorClass(CountUsersKeyWritable.CountUsersGroupComparator.class);
-      countUsers.waitForCompletion(true);
+      numberOfUsers = (int) toUserVector.getCounters().findCounter(ToUserVectorReducer.Counters.USERS).getValue();
     }
 
     if (shouldRunNextPhase(parsedArgs, currentPhase)) {
@@ -212,8 +191,6 @@ public final class RecommenderJob extends AbstractJob {
       maybePruneAndTransponse.waitForCompletion(true);
     }
 
-    int numberOfUsers = TasteHadoopUtils.readIntFromFile(getConf(), countUsersPath);
-
     if (shouldRunNextPhase(parsedArgs, currentPhase)) {
       /* Once DistributedRowMatrix uses the hadoop 0.20 API, we should refactor this call to something like
        * new DistributedRowMatrix(...).rowSimilarity(...) */
@@ -224,7 +201,7 @@ public final class RecommenderJob extends AbstractJob {
           "--numberOfColumns", String.valueOf(numberOfUsers),
           "--similarityClassname", similarityClassname,
           "--maxSimilaritiesPerRow", String.valueOf(maxSimilaritiesPerItem + 1),
-          "--tempDir", tempDirPath.toString() });
+          "--tempDir", getTempPath().toString() });
       } catch (Exception e) {
         throw new IllegalStateException("item-item-similarity computation failed", e);
       }
@@ -255,13 +232,7 @@ public final class RecommenderJob extends AbstractJob {
           SequenceFileInputFormat.class, Mapper.class, VarIntWritable.class, VectorOrPrefWritable.class,
           ToVectorAndPrefReducer.class, VarIntWritable.class, VectorAndPrefsWritable.class,
           SequenceFileOutputFormat.class);
-
-      /* necessary to make this job (having a combined input path) work on Amazon S3 */
-      Configuration partialMultiplyConf = partialMultiply.getConfiguration();
-      FileSystem fs = FileSystem.get(tempDirPath.toUri(), partialMultiplyConf);
-      prePartialMultiplyPath1 = prePartialMultiplyPath1.makeQualified(fs);
-      prePartialMultiplyPath2 = prePartialMultiplyPath2.makeQualified(fs);
-      FileInputFormat.setInputPaths(partialMultiply, prePartialMultiplyPath1, prePartialMultiplyPath2);
+      setS3SafeCombinedInputPath(partialMultiply, getTempPath(), prePartialMultiplyPath1, prePartialMultiplyPath2);
       partialMultiply.waitForCompletion(true);
     }
 
@@ -292,11 +263,7 @@ public final class RecommenderJob extends AbstractJob {
       }
 
       if (filterFile != null) {
-        /* necessary to make this job (having a combined input path) work on Amazon S3 */
-        FileSystem fs = FileSystem.get(tempDirPath.toUri(), aggregateAndRecommendConf);
-        partialMultiplyPath = partialMultiplyPath.makeQualified(fs);
-        explicitFilterPath = explicitFilterPath.makeQualified(fs);
-        FileInputFormat.setInputPaths(aggregateAndRecommend, partialMultiplyPath, explicitFilterPath);
+        setS3SafeCombinedInputPath(aggregateAndRecommend, getTempPath(), partialMultiplyPath, explicitFilterPath);
       }
       setIOSort(aggregateAndRecommend);
       aggregateAndRecommendConf.set(AggregateAndRecommendReducer.ITEMID_INDEX_PATH, itemIDIndexPath.toString());

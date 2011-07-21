@@ -20,12 +20,12 @@
   <parent>
     <groupId>org.apache.mahout</groupId>
     <artifactId>mahout</artifactId>
-    <version>0.5-SNAPSHOT</version>
+    <version>0.6-SNAPSHOT</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
   <groupId>org.apache.mahout</groupId>
   <artifactId>mahout-distribution</artifactId>
-  <version>0.5-SNAPSHOT</version>
+  <version>0.6-SNAPSHOT</version>
   <name>Mahout Release Package</name>
   <description>Distribution Package</description>
   <packaging>pom</packaging>
@@ -94,7 +94,7 @@
     </dependency>
     <dependency>
       <groupId>org.apache.mahout</groupId>
-      <artifactId>mahout-utils</artifactId>
+      <artifactId>mahout-integration</artifactId>
       <version>${project.version}</version>
     </dependency>
     <dependency>
@@ -106,12 +106,6 @@
       <groupId>org.apache.mahout</groupId>
       <artifactId>mahout-examples</artifactId>
       <version>${project.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.mahout</groupId>
-      <artifactId>mahout-taste-webapp</artifactId>
-      <version>${project.version}</version>
-      <type>war</type>
     </dependency>
   </dependencies>
 </project>
